@@ -7,9 +7,11 @@
 </div>
 
 
-## 鸣谢
+## 示例
 
-- 感谢 [imsyy/DailyHot](https://github.com/imsyy/DailyHot) 项目的启发与支持
+> 这里是示例站点
+
+- [今日热榜 - https://hot.imsyy.top/](https://hot.imsyy.top/)
 
 
 ## 部署

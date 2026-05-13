@@ -40,26 +40,28 @@ axios.interceptors.response.use(
   },
   (error) => {
     $loadingBar.error();
-    const responseData = error?.response?.data || {};
     const errorMessage =
-      responseData.msg || responseData.message || "请求失败，请稍后重试";
-
+      error.response?.data?.msg ||
+      error.response?.data?.message ||
+      "请求失败，请稍后重试";
     if (error.response) {
+      let data = error.response.data;
+      const responseMessage = data?.msg || data?.message;
       switch (error.response.status) {
         case 401:
-          $message.error(errorMessage || "请登录后使用");
+          $message.error(responseMessage || "请登录后使用");
           break;
         case 301:
-          $message.error(errorMessage || "请求路径发生跳转");
+          $message.error(responseMessage || "请求路径发生跳转");
           break;
         case 403:
-          $message.error(errorMessage || "暂无访问权限");
+          $message.error(responseMessage || "暂无访问权限");
           break;
         case 404:
-          $message.error(errorMessage || "请求资源不存在");
+          $message.error(responseMessage || "请求资源不存在");
           break;
         case 500:
-          $message.error(errorMessage || "内部服务器错误");
+          $message.error(responseMessage || "内部服务器错误");
           break;
         default:
           $message.error(errorMessage);

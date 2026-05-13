@@ -1,19 +1,23 @@
 <template>
   <div class="list">
-    <n-space class="type" v-if="newsSourceItems[0]">
+    <n-space class="type" v-if="store.newsArr[0]">
       <n-tag
         round
         size="large"
         class="tag"
-        :class="{ inactive: !item.beEnabled }"
-        v-for="item in newsSourceItems.filter((item) => item.show)"
+        v-for="item in store.newsArr.filter((item) => item.show)"
         :key="item"
         :type="item.name === listType ? 'primary' : 'default'"
         @click="changeType(item.name)"
       >
         {{ item.label }}
         <template #avatar>
-          <img :src="`/logo/${item.name}.png`" alt="logo" class="logo" />
+          <img
+            :src="`/logo/${item.name}.png`"
+            alt="logo"
+            class="logo"
+            @error="handleLogoError"
+          />
         </template>
       </n-tag>
     </n-space>
@@ -28,7 +32,7 @@
           <template v-else>
             <div class="header">
               <div class="logo">
-                <img :src="`/logo/${listType}.png`" alt="logo" />
+                <img :src="`/logo/${listType}.png`" alt="logo" @error="handleLogoError" />
               </div>
               <div class="name">
                 <n-text class="title">{{ listData.title }}</n-text>
@@ -41,12 +45,9 @@
                   v-if="listData.total"
                   :depth="3"
                   class="total"
-                >
-                  {{ listData.total }}
-                </n-text>
-                <n-text v-if="updateTime" :depth="3" class="time">
-                  {{ updateTime }}
-                </n-text>
+                  v-html="listData.total"
+                />
+                <n-text :depth="3" class="time" v-html="updateTime" />
               </div>
             </div>
           </template>
@@ -64,22 +65,17 @@
             />
           </div>
         </template>
-        <template v-else-if="listData.status === 'unsupported'">
-          <div class="placeholder">
-            <n-empty description="当前榜单暂未接入 be-vita 热榜服务" />
-          </div>
-        </template>
-        <template v-else-if="listData.status === 'error'">
-          <div class="placeholder">
+        <template v-else-if="loadingError">
+          <div class="loading" style="justify-content: center; min-height: 320px">
             <n-result
               status="500"
               title="热榜加载失败"
-              :description="listData.message"
+              :description="listData?.message || '热榜加载失败，请稍后重试'"
             />
           </div>
         </template>
-        <template v-else-if="listData.status === 'empty'">
-          <div class="placeholder">
+        <template v-else-if="listData.data.length === 0">
+          <div class="loading" style="justify-content: center; min-height: 320px">
             <n-empty description="当前榜单暂无数据" />
           </div>
         </template>
@@ -91,7 +87,7 @@
                   pageNumber * 20 - 20,
                   pageNumber * 20
                 )"
-                :key="`${listType}-${item.title}-${index}`"
+                :key="item"
                 @click="jumpLink(item)"
               >
                 <template #prefix>
@@ -129,7 +125,6 @@
               </n-list-item>
             </n-list>
             <n-pagination
-              v-if="showPagination"
               class="pagination"
               :page-slot="5"
               :item-count="listData.data.length"
@@ -149,64 +144,70 @@ import { mainStore } from "@/store";
 import { useRouter } from "vue-router";
 import { formatTime } from "@/utils/getTime";
 import { getHotLists } from "@/api";
-import { isRenderableHotData } from "@/utils/hot";
 
 const router = useRouter();
 const store = mainStore();
-const newsSourceItems = computed(() => {
-  return store.newsArr.length > 0 ? store.newsArr : store.defaultNewsArr;
-});
-
-const resolvePageNumber = (page) => {
-  const value = Number(page);
-
-  return Number.isFinite(value) && value > 0 ? value : 1;
-};
 
 const updateTime = ref(null);
 const listType = ref(
-  router.currentRoute.value.query.type || newsSourceItems.value[0]?.name
+  router.currentRoute.value.query.type || store.newsArr[0].name
 );
-const pageNumber = ref(resolvePageNumber(router.currentRoute.value.query.page));
+const pageNumber = ref(
+  router.currentRoute.value.query.page
+    ? Number(router.currentRoute.value.query.page)
+    : 1
+);
 const listData = ref(null);
-const showPagination = computed(() => {
-  return isRenderableHotData(listData.value?.status) && listData.value.data.length > 0;
-});
+const loadingError = ref(false);
 
 const syncUpdateTime = () => {
-  if (!listData.value?.updateTime) {
-    updateTime.value = null;
-    return;
-  }
+  updateTime.value = listData.value?.updateTime
+    ? formatTime(listData.value.updateTime)
+    : null;
+};
 
-  const formattedTime = formatTime(listData.value.updateTime);
-  updateTime.value =
-    listData.value.status === "stale"
-      ? `${formattedTime} · 缓存较旧`
-      : formattedTime;
+const handleLogoError = (event) => {
+  const target = event?.target;
+  if (!target || target.dataset.fallbackApplied === "true") return;
+  target.dataset.fallbackApplied = "true";
+  target.src = "/ico/icon_error.png";
 };
 
 // 获取热榜数据
-const getHotListsData = async (name) => {
+const getHotListsData = async (name, isNew = false) => {
   listData.value = null;
-  const item = newsSourceItems.value.find((newsItem) => newsItem.name === name);
-
+  loadingError.value = false;
+  updateTime.value = null;
+  const item = store.newsArr.find((item) => item.name == name);
   if (!item) {
+    loadingError.value = true;
     listData.value = {
       title: "未知榜单",
       subtitle: "加载失败",
       total: null,
-      updateTime: null,
-      status: "error",
-      message: "热榜配置不存在",
+      message: "榜单配置不存在",
       data: [],
     };
-    updateTime.value = null;
     return;
   }
-
-  listData.value = await getHotLists(item);
-  syncUpdateTime();
+  getHotLists(item.name, isNew, item.params).then((res) => {
+    if (res.code === 200) {
+      listData.value = res;
+      syncUpdateTime();
+    } else {
+      loadingError.value = true;
+      listData.value = res;
+    }
+  }).catch(() => {
+    loadingError.value = true;
+    listData.value = {
+      title: item.label,
+      subtitle: "加载失败",
+      total: null,
+      message: "热榜加载失败，请稍后重试",
+      data: [],
+    };
+  });
 };
 
 // 链接跳转
@@ -235,9 +236,7 @@ const changeType = (type) => {
 watch(
   () => store.timeData,
   () => {
-    if (listData.value?.updateTime) {
-      syncUpdateTime();
-    }
+    if (listData.value) syncUpdateTime();
   }
 );
 
@@ -261,8 +260,8 @@ watch(
   () => router.currentRoute.value,
   (val) => {
     if (val.name === "list") {
-      listType.value = val.query.type || newsSourceItems.value[0]?.name;
-      pageNumber.value = resolvePageNumber(val.query.page);
+      listType.value = val.query.type;
+      pageNumber.value = Number(val.query.page) || 1;
       getHotListsData(listType.value);
     }
   }
@@ -279,9 +278,6 @@ onMounted(() => {
     width: 100%;
     .tag {
       cursor: pointer;
-      &.inactive {
-        opacity: 0.65;
-      }
       .logo {
         height: 22px;
         width: 22px;
@@ -342,7 +338,13 @@ onMounted(() => {
         justify-content: flex-end;
         font-size: 14px;
         .total {
-          margin-right: 6px;
+          &::before {
+            content: "共 ";
+          }
+          &::after {
+            content: " 条 ·";
+            margin-right: 6px;
+          }
         }
       }
       @media (max-width: 740px) {
@@ -440,13 +442,6 @@ onMounted(() => {
           }
         }
       }
-    }
-
-    .placeholder {
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 360px;
     }
   }
 }

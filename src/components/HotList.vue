@@ -5,9 +5,6 @@
     :footer-style="{ padding: '16px' }"
     :id="`hot-list-${hotData.name}`"
     class="hot-list"
-    :class="{
-      unsupported: currentHotItem && currentHotItem.beEnabled === false,
-    }"
     hoverable
     @click="toList"
   >
@@ -25,19 +22,16 @@
           {{ hotListData.type }}
         </n-text>
         <n-skeleton v-else width="60px" text round />
-        </n-space>
+      </n-space>
     </template>
     <n-scrollbar class="news-list" ref="scrollbarRef">
       <Transition name="fade" mode="out-in">
-        <div v-if="!hotListData || listLoading" class="loading">
-          <n-skeleton text round :repeat="10" height="20px" />
-        </div>
-        <div v-else-if="hotListData.status === 'error'" class="error">
+        <div v-if="loadingError" class="error">
           <n-result
             size="small"
             status="500"
             title="哎呀，加载失败了"
-            :description="hotListData.message"
+            :description="hotListData?.message || '热榜加载失败，请稍后重试'"
             style="margin-top: 40px"
           />
           <n-button
@@ -45,7 +39,7 @@
             secondary
             strong
             round
-            @click.stop="getHotListsData(hotData.name, false)"
+            @click.stop="getHotListsData(hotData.name)"
           >
             <template #icon>
               <n-icon :component="Refresh" />
@@ -53,20 +47,17 @@
             重试
           </n-button>
         </div>
-        <div
-          v-else-if="hotListData.status === 'unsupported'"
-          class="placeholder"
-        >
-          <n-empty description="当前榜单暂未接入 be-vita 热榜服务" />
+        <div v-else-if="!hotListData || listLoading" class="loading">
+          <n-skeleton text round :repeat="10" height="20px" />
         </div>
-        <div v-else-if="hotListData.status === 'empty'" class="placeholder">
+        <div v-else-if="hotListData.data.length === 0" class="loading">
           <n-empty description="当前榜单暂无数据" />
         </div>
         <div v-else class="lists" :id="hotData.name + 'Lists'">
           <div
             class="item"
             v-for="(item, index) in hotListData.data.slice(0, 15)"
-            :key="`${hotData.name}-${item.title}-${index}`"
+            :key="item"
           >
             <n-text
               class="num"
@@ -102,14 +93,12 @@
         </template>
         <template v-else>
           <div class="message">
-            <n-text class="time" :depth="3">
-              {{ footerText }}
+            <n-text class="time" :depth="3" v-if="updateTime">
+              {{ updateTime }}
             </n-text>
-            <n-space
-              v-if="hotListData.status !== 'unsupported'"
-              class="controls"
-            >
-              <n-popover v-if="showMoreButton">
+            <n-text class="time" :depth="3" v-else> 获取失败 </n-text>
+            <n-space class="controls">
+              <n-popover v-if="hotListData.data.length > 15">
                 <template #trigger>
                   <n-button
                     size="tiny"
@@ -125,7 +114,7 @@
                 </template>
                 查看更多
               </n-popover>
-              <n-popover v-if="currentHotItem?.beEnabled">
+              <n-popover>
                 <template #trigger>
                   <n-button
                     size="tiny"
@@ -139,7 +128,7 @@
                     </template>
                   </n-button>
                 </template>
-                重新获取
+                获取最新
               </n-popover>
             </n-space>
           </div>
@@ -153,7 +142,6 @@
 import { Refresh, More } from "@icon-park/vue-next";
 import { getHotLists } from "@/api";
 import { formatTime } from "@/utils/getTime";
-import { isRenderableHotData } from "@/utils/hot";
 import { mainStore } from "@/store";
 import { useRouter } from "vue-router";
 
@@ -169,35 +157,6 @@ const props = defineProps({
 
 // 更新时间
 const updateTime = ref(null);
-const hotRegistry = computed(() => {
-  return store.newsArr.length > 0 ? store.newsArr : store.defaultNewsArr;
-});
-const currentHotItem = computed(() => {
-  return hotRegistry.value.find((item) => item.name === props.hotData.name) || props.hotData;
-});
-const listStatus = computed(() => hotListData.value?.status || null);
-const showMoreButton = computed(() => {
-  return (
-    isRenderableHotData(listStatus.value) &&
-    (hotListData.value?.data?.length || 0) > 15
-  );
-});
-const footerText = computed(() => {
-  if (updateTime.value) {
-    return listStatus.value === "stale" ? `${updateTime.value} · 缓存较旧` : updateTime.value;
-  }
-
-  switch (listStatus.value) {
-    case "unsupported":
-      return "暂未接入";
-    case "empty":
-      return "暂无数据";
-    case "error":
-      return "获取失败";
-    default:
-      return "加载中";
-  }
-});
 
 // 刷新按钮数据
 const lastClickTime = ref(
@@ -208,6 +167,7 @@ const lastClickTime = ref(
 const hotListData = ref(null);
 const scrollbarRef = ref(null);
 const listLoading = ref(false);
+const loadingError = ref(false);
 
 const syncUpdateTime = () => {
   updateTime.value = hotListData.value?.updateTime
@@ -216,22 +176,43 @@ const syncUpdateTime = () => {
 };
 
 // 获取热榜数据
-const getHotListsData = async (name, useCooldown = true) => {
-  listLoading.value = true;
-  const item =
-    hotRegistry.value.find((newsItem) => newsItem.name === name) || props.hotData;
-  const result = await getHotLists(item);
-
-  hotListData.value = result;
-  listLoading.value = false;
-  syncUpdateTime();
-
-  if (scrollbarRef.value && isRenderableHotData(result.status)) {
-    scrollbarRef.value.scrollTo({ position: "top", behavior: "smooth" });
-  }
-
-  if (!useCooldown && result.status === "error") {
-    $message.error(result.message);
+const getHotListsData = async (name, isNew = false) => {
+  try {
+    loadingError.value = false;
+    listLoading.value = true;
+    const item = store.newsArr.find((item) => item.name == name);
+    if (!item) {
+      hotListData.value = {
+        data: [],
+        message: "榜单配置不存在",
+      };
+      updateTime.value = null;
+      listLoading.value = false;
+      loadingError.value = true;
+      $message.error("榜单配置不存在");
+      return;
+    }
+    const result = await getHotLists(item.name, isNew, item.params);
+    hotListData.value = result;
+    syncUpdateTime();
+    listLoading.value = false;
+    if (result.code === 200) {
+      // 滚动至顶部
+      if (scrollbarRef.value) {
+        scrollbarRef.value.scrollTo({ position: "top", behavior: "smooth" });
+      }
+    } else {
+      loadingError.value = true;
+    }
+  } catch (error) {
+    listLoading.value = false;
+    loadingError.value = true;
+    updateTime.value = null;
+    hotListData.value = {
+      data: [],
+      message: "热榜加载失败，请稍后重试",
+    };
+    $message.error("热榜加载失败，请重试");
   }
 };
 
@@ -240,7 +221,8 @@ const getNewData = () => {
   const now = Date.now();
   if (now - lastClickTime.value > 60000) {
     // 点击事件
-    getHotListsData(props.hotData.name);
+    listLoading.value = true;
+    getHotListsData(props.hotData.name, true);
     // 更新最后一次点击时间
     lastClickTime.value = now;
     localStorage.setItem(`${props.hotData.name}Btn`, now);
@@ -280,7 +262,6 @@ const checkListShow = () => {
   const typeName = props.hotData.name;
   const listId = "hot-list-" + typeName;
   const listDom = document.getElementById(listId);
-  if (!listDom) return;
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (entry.isIntersecting) {
@@ -297,9 +278,7 @@ const checkListShow = () => {
 watch(
   () => store.timeData,
   () => {
-    if (hotListData.value?.updateTime) {
-      syncUpdateTime();
-    }
+    if (hotListData.value) syncUpdateTime();
   }
 );
 
@@ -313,9 +292,6 @@ onMounted(() => {
   border-radius: 12px;
   transition: all 0.3s;
   cursor: pointer;
-  &.unsupported {
-    opacity: 0.72;
-  }
   .title {
     display: flex;
     align-items: center;
@@ -364,13 +340,6 @@ onMounted(() => {
       .n-button {
         margin-top: 12px;
       }
-    }
-
-    .placeholder {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      height: 300px;
     }
 
     .loading {

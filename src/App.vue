@@ -42,7 +42,7 @@ onMounted(() => {
   // 写入默认
   nextTick(() => {
     if (store.newsArr.length === 0) {
-      store.newsArr = store.defaultNewsArr.map((item) => ({ ...item }));
+      store.newsArr = store.defaultNewsArr;
     }
   });
 });

@@ -110,7 +110,12 @@
             :content-style="{ display: 'flex', alignItems: 'center' }"
           >
             <div class="desc" :style="{ opacity: element.show ? null : 0.6 }">
-              <img class="logo" :src="`/logo/${element.name}.png`" alt="logo" />
+              <img
+                class="logo"
+                :src="`/logo/${element.name}.png`"
+                alt="logo"
+                @error="handleLogoError"
+              />
               <n-text class="news-name" v-html="element.label" />
             </div>
             <n-switch
@@ -184,6 +189,13 @@ const linkOptions = [
   },
 ];
 
+const handleLogoError = (event) => {
+  const target = event?.target;
+  if (!target || target.dataset.fallbackApplied === "true") return;
+  target.dataset.fallbackApplied = "true";
+  target.src = "/ico/icon_error.png";
+};
+
 // 开启明暗自动跟随
 const themeAutoOpen = (val) => {
   console.log(osThemeRef.value);
@@ -194,17 +206,7 @@ const themeAutoOpen = (val) => {
 
 // 恢复默认排序
 const restoreDefault = () => {
-  newsArr.value = store.defaultNewsArr.map((defaultItem) => {
-    const currentItem = newsArr.value.find((item) => item.name === defaultItem.name);
-
-    return {
-      ...defaultItem,
-      show:
-        typeof currentItem?.show === "boolean"
-          ? currentItem.show
-          : defaultItem.show,
-    };
-  });
+  newsArr.value = newsArr.value.sort((a, b) => a.order - b.order);
   $message.success("恢复默认榜单排序成功");
 };
 
