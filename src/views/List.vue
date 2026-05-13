@@ -13,7 +13,7 @@
         {{ item.label }}
         <template #avatar>
           <img
-            :src="`/logo/${item.name}.png`"
+            :src="getLogoUrl(item.name)"
             alt="logo"
             class="logo"
             @error="handleLogoError"
@@ -32,7 +32,7 @@
           <template v-else>
             <div class="header">
               <div class="logo">
-                <img :src="`/logo/${listType}.png`" alt="logo" @error="handleLogoError" />
+                <img :src="getLogoUrl(listType)" alt="logo" @error="handleLogoError" />
               </div>
               <div class="name">
                 <n-text class="title">{{ listData.title }}</n-text>
@@ -140,6 +140,7 @@
 
 <script setup>
 import { Fire } from "@icon-park/vue-next";
+import { getPublicAssetUrl } from "@/utils/assets";
 import { mainStore } from "@/store";
 import { useRouter } from "vue-router";
 import { formatTime } from "@/utils/getTime";
@@ -147,6 +148,8 @@ import { getHotLists } from "@/api";
 
 const router = useRouter();
 const store = mainStore();
+const iconErrorUrl = getPublicAssetUrl("ico/icon_error.png");
+const getLogoUrl = (name) => getPublicAssetUrl(`logo/${name}.png`);
 
 const updateTime = ref(null);
 const listType = ref(
@@ -170,7 +173,7 @@ const handleLogoError = (event) => {
   const target = event?.target;
   if (!target || target.dataset.fallbackApplied === "true") return;
   target.dataset.fallbackApplied = "true";
-  target.src = "/ico/icon_error.png";
+  target.src = iconErrorUrl;
 };
 
 // 获取热榜数据

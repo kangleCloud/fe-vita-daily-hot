@@ -6,9 +6,23 @@ import vue from "@vitejs/plugin-vue";
 import AutoImport from "unplugin-auto-import/vite";
 import Components from "unplugin-vue-components/vite";
 
+const normalizeBase = (base = "/") => {
+  const normalizedBase = base.trim() || "/";
+  const withLeadingSlash = normalizedBase.startsWith("/")
+    ? normalizedBase
+    : `/${normalizedBase}`;
+
+  return withLeadingSlash.endsWith("/")
+    ? withLeadingSlash
+    : `${withLeadingSlash}/`;
+};
+
 export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd());
+  const base = normalizeBase(env.VITE_DIR);
+
   return {
-    base: loadEnv(mode, process.cwd())["VITE_DIR"],
+    base,
     plugins: [
       vue(),
       AutoImport({
@@ -55,12 +69,13 @@ export default defineConfig(({ mode }) => {
           short_name: "DailyHot",
           description: "汇聚全网热点，热门尽览无余",
           display: "standalone",
-          start_url: "/",
+          start_url: base,
+          scope: base,
           theme_color: "#fff",
           background_color: "#efefef",
           icons: [
             {
-              src: "/ico/favicon.png",
+              src: `${base}ico/favicon.png`,
               sizes: "200x200",
               type: "image/png",
             },

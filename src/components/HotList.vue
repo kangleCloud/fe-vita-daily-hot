@@ -13,8 +13,8 @@
         <div class="name">
           <n-avatar
             class="ico"
-            :src="`/logo/${hotData.name}.png`"
-            fallback-src="/ico/icon_error.png"
+            :src="getLogoUrl(hotData.name)"
+            :fallback-src="iconErrorUrl"
           />
           <n-text class="name-text">{{ hotData.label }}</n-text>
         </div>
@@ -141,6 +141,7 @@
 <script setup>
 import { Refresh, More } from "@icon-park/vue-next";
 import { getHotLists } from "@/api";
+import { getPublicAssetUrl } from "@/utils/assets";
 import { formatTime } from "@/utils/getTime";
 import { mainStore } from "@/store";
 import { useRouter } from "vue-router";
@@ -154,6 +155,8 @@ const props = defineProps({
     default: {},
   },
 });
+const iconErrorUrl = getPublicAssetUrl("ico/icon_error.png");
+const getLogoUrl = (name) => getPublicAssetUrl(`logo/${name}.png`);
 
 // 更新时间
 const updateTime = ref(null);

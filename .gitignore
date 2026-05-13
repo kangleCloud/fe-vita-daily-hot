@@ -33,3 +33,12 @@ coverage
 out/
 build/
 target/
+
+# MacOS
+.DS_Store
+
+#  Archives
+*.zip
+*.tar
+*.tar.gz
+*.tgz

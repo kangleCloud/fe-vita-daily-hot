@@ -1,16 +1,8 @@
 import axios from "axios";
 
-switch (process.env.NODE_ENV) {
-  case "production":
-    axios.defaults.baseURL = import.meta.env.VITE_GLOBAL_API;
-    break;
-  case "development":
-    axios.defaults.baseURL = import.meta.env.VITE_GLOBAL_API;
-    break;
-  default:
-    axios.defaults.baseURL = import.meta.env.VITE_GLOBAL_API;
-    break;
-}
+const apiBaseUrl = import.meta.env.VITE_GLOBAL_API;
+
+axios.defaults.baseURL = typeof apiBaseUrl === "string" ? apiBaseUrl : "";
 
 axios.defaults.timeout = 30000;
 axios.defaults.headers = { "Content-Type": "application/json" };

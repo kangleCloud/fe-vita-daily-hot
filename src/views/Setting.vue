@@ -112,7 +112,7 @@
             <div class="desc" :style="{ opacity: element.show ? null : 0.6 }">
               <img
                 class="logo"
-                :src="`/logo/${element.name}.png`"
+                :src="getLogoUrl(element.name)"
                 alt="logo"
                 @error="handleLogoError"
               />
@@ -149,6 +149,7 @@
 </template>
 
 <script setup>
+import { getPublicAssetUrl } from "@/utils/assets";
 import { storeToRefs } from "pinia";
 import { mainStore } from "@/store";
 import { useOsTheme } from "naive-ui";
@@ -156,6 +157,8 @@ import draggable from "vuedraggable";
 
 const store = mainStore();
 const osThemeRef = useOsTheme();
+const iconErrorUrl = getPublicAssetUrl("ico/icon_error.png");
+const getLogoUrl = (name) => getPublicAssetUrl(`logo/${name}.png`);
 const {
   siteTheme,
   siteThemeAuto,
@@ -193,7 +196,7 @@ const handleLogoError = (event) => {
   const target = event?.target;
   if (!target || target.dataset.fallbackApplied === "true") return;
   target.dataset.fallbackApplied = "true";
-  target.src = "/ico/icon_error.png";
+  target.src = iconErrorUrl;
 };
 
 // 开启明暗自动跟随
