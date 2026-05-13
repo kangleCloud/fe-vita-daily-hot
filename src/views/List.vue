@@ -174,7 +174,7 @@ const handleLogoError = (event) => {
 };
 
 // 获取热榜数据
-const getHotListsData = async (name, isNew = false) => {
+const getHotListsData = async (name, forceRefresh = false) => {
   listData.value = null;
   loadingError.value = false;
   updateTime.value = null;
@@ -190,24 +190,29 @@ const getHotListsData = async (name, isNew = false) => {
     };
     return;
   }
-  getHotLists(item.name, isNew, item.params).then((res) => {
-    if (res.code === 200) {
-      listData.value = res;
-      syncUpdateTime();
-    } else {
+  getHotLists(item.name, {
+    forceRefresh,
+    params: item.params,
+  })
+    .then((res) => {
+      if (res.code === 200) {
+        listData.value = res;
+        syncUpdateTime();
+      } else {
+        loadingError.value = true;
+        listData.value = res;
+      }
+    })
+    .catch(() => {
       loadingError.value = true;
-      listData.value = res;
-    }
-  }).catch(() => {
-    loadingError.value = true;
-    listData.value = {
-      title: item.label,
-      subtitle: "加载失败",
-      total: null,
-      message: "热榜加载失败，请稍后重试",
-      data: [],
-    };
-  });
+      listData.value = {
+        title: item.label,
+        subtitle: "加载失败",
+        total: null,
+        message: "热榜加载失败，请稍后重试",
+        data: [],
+      };
+    });
 };
 
 // 链接跳转

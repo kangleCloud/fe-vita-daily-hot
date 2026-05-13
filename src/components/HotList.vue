@@ -176,7 +176,7 @@ const syncUpdateTime = () => {
 };
 
 // 获取热榜数据
-const getHotListsData = async (name, isNew = false) => {
+const getHotListsData = async (name, forceRefresh = false) => {
   try {
     loadingError.value = false;
     listLoading.value = true;
@@ -192,7 +192,10 @@ const getHotListsData = async (name, isNew = false) => {
       $message.error("榜单配置不存在");
       return;
     }
-    const result = await getHotLists(item.name, isNew, item.params);
+    const result = await getHotLists(item.name, {
+      forceRefresh,
+      params: item.params,
+    });
     hotListData.value = result;
     syncUpdateTime();
     listLoading.value = false;
